@@ -1,17 +1,11 @@
-/*package com.example;
+package com.example;
 
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.springframework.test.context.web.WebAppConfiguration;
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
 
 import com.brownfield.pss.search.Application;
 
-import org.springframework.boot.test.SpringApplicationConfiguration;
-import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
-
-@RunWith(SpringJUnit4ClassRunner.class)
-@SpringApplicationConfiguration(classes = Application.class)
-@WebAppConfiguration
+@SpringBootTest(classes = Application.class)
 public class ApplicationTests {
 
 	@Test
@@ -19,4 +13,3 @@ public class ApplicationTests {
 	}
 
 }
-*/

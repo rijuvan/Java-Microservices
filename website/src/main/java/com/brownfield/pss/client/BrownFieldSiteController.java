@@ -9,10 +9,11 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.client.RestTemplate;
 
 @Controller
@@ -25,7 +26,7 @@ public class BrownFieldSiteController {
 
   	RestTemplate checkInClient = new RestTemplate();
 	
-    @RequestMapping(value="/", method=RequestMethod.GET)
+    @GetMapping("/")
     public String greetingForm(Model model) {
     	SearchQuery query = new  SearchQuery("NYC","SFO","22-JAN-16");
     	UIData uiData = new UIData();
@@ -34,7 +35,7 @@ public class BrownFieldSiteController {
         return "search";
     }   
 
-   @RequestMapping(value="/search", method=RequestMethod.POST)
+   @PostMapping("/search")
    public String greetingSubmit(@ModelAttribute UIData uiData, Model model) {
 		Flight[] flights = searchClient.postForObject("http://localhost:8090/search/get", uiData.getSearchQuery(), Flight[].class); 
 		uiData.setFlights(Arrays.asList(flights));
@@ -42,7 +43,7 @@ public class BrownFieldSiteController {
        return "result";
    }
    
-   @RequestMapping(value="/book/{flightNumber}/{origin}/{destination}/{flightDate}/{fare}", method=RequestMethod.GET)
+   @GetMapping("/book/{flightNumber}/{origin}/{destination}/{flightDate}/{fare}")
    public String bookQuery(@PathVariable String flightNumber, 
 		   @PathVariable String origin, 
 		   @PathVariable String destination, 
@@ -56,7 +57,7 @@ public class BrownFieldSiteController {
 	   model.addAttribute("uidata",uiData);
        return "book"; 
    }
-   @RequestMapping(value="/confirm", method=RequestMethod.POST)
+   @PostMapping("/confirm")
    public String ConfirmBooking(@ModelAttribute UIData uiData, Model model) {
 	   	Flight flight= uiData.getSelectedFlight();
 		BookingRecord booking = new BookingRecord(flight.getFlightNumber(),flight.getOrigin(),
@@ -78,7 +79,7 @@ public class BrownFieldSiteController {
 		model.addAttribute("message", "Your Booking is confirmed. Reference Number is "+ bookingId);
 		return "confirm";
    }
-   @RequestMapping(value="/search-booking", method=RequestMethod.GET)
+   @GetMapping("/search-booking")
    public String searchBookingForm(Model model) {
    		UIData uiData = new UIData();
    		uiData.setBookingid("5");
@@ -86,7 +87,7 @@ public class BrownFieldSiteController {
    		return "bookingsearch";
    }   
 
-	@RequestMapping(value="/search-booking-get", method=RequestMethod.POST)
+	@PostMapping("/search-booking-get")
 	public String searchBookingSubmit(@ModelAttribute UIData uiData, Model model) {
 		Long id = new Long(uiData.getBookingid());
  		BookingRecord booking = bookingClient.getForObject("http://localhost:8060/booking/get/"+id, BookingRecord.class);
@@ -101,7 +102,7 @@ public class BrownFieldSiteController {
 	   return "bookingsearch";
 	}
 	
-	@RequestMapping(value="/checkin/{flightNumber}/{origin}/{destination}/{flightDate}/{fare}/{firstName}/{lastName}/{gender}/{bookingid}", method=RequestMethod.GET)
+	@GetMapping("/checkin/{flightNumber}/{origin}/{destination}/{flightDate}/{fare}/{firstName}/{lastName}/{gender}/{bookingid}")
 	public String bookQuery(@PathVariable String flightNumber, 
 			   @PathVariable String origin, 
 			   @PathVariable String destination, 
@@ -113,12 +114,12 @@ public class BrownFieldSiteController {
 			   @PathVariable String bookingid, 
 			   Model model) {
 		
- 
+
 			CheckInRecord checkIn = new CheckInRecord(firstName, lastName, "28C", null,
 					  									flightDate,flightDate, new Long(bookingid).longValue());
 
 			long checkinId = checkInClient.postForObject("http://localhost:8070/checkin/create", checkIn, long.class); 
 	   		model.addAttribute("message","Checked In, Seat Number is 28c , checkin id is "+ checkinId);
 	       return "checkinconfirm"; 
-	}	
+	}
 }
