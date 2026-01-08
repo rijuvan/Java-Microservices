@@ -78,13 +78,16 @@ public class BookingComponent {
 	}
 
 	public BookingRecord getBooking(long id) {
-		return bookingRepository.findOne(id);
+		return bookingRepository.findById(id).orElse(null);
 	}
 	
 	
 	public void updateStatus(String status, long bookingId) {
-		BookingRecord record = bookingRepository.findOne(bookingId);
-		record.setStatus(status);
+		BookingRecord record = bookingRepository.findById(bookingId).orElse(null);
+		if (record != null) {
+			record.setStatus(status);
+			bookingRepository.save(record);
+		}
 	}
 	
 }

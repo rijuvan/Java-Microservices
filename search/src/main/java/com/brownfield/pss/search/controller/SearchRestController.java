@@ -4,9 +4,9 @@ import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.brownfield.pss.search.component.SearchComponent;
@@ -24,7 +24,7 @@ class SearchRestController {
 		this.searchComponent = searchComponent;
 	}
 	
-	@RequestMapping(value="/get", method = RequestMethod.POST)
+	@PostMapping("/get")
 	List<Flight> search(@RequestBody SearchQuery query){
 		System.out.println("Input : "+ query);
 		return searchComponent.search(query);

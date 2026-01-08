@@ -2,10 +2,11 @@ package com.brownfield.pss.checkin.controller;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.brownfield.pss.checkin.component.CheckinComponent;
@@ -23,12 +24,12 @@ public class CheckInController {
 		this.checkInComponent = checkInComponent;
 	}
 	
-	@RequestMapping("/get/{id}")
+	@GetMapping("/get/{id}")
 	CheckInRecord getCheckIn(@PathVariable long id ){
 		return checkInComponent.getCheckInRecord(id);
 	}
 
-	@RequestMapping(value ="/create", method = RequestMethod.POST)
+	@PostMapping("/create")
 	long checkIn(@RequestBody CheckInRecord checkIn){
 		return checkInComponent.checkIn(checkIn);
 	}
