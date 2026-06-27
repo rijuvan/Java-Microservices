@@ -1,31 +1,24 @@
 package com.brownfield.pss.book.component;
 
-import org.springframework.amqp.core.Queue;
-import org.springframework.amqp.rabbit.core.RabbitMessagingTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Bean;
+import org.springframework.jms.core.JmsTemplate;
 import org.springframework.stereotype.Component;
 
-@Component 
+// ActiveMQ: JmsTemplate replaces RabbitMessagingTemplate.
+// Queues (SearchQ, CheckINQ) are auto-created by the broker on first send — no @Bean Queue declarations needed.
+@Component
 public class Sender {
-	
-	RabbitMessagingTemplate template;
+
+	JmsTemplate jmsTemplate;
 
 	@Autowired
-	Sender(RabbitMessagingTemplate template){
-		this.template = template;
+	Sender(JmsTemplate jmsTemplate) {
+		this.jmsTemplate = jmsTemplate;
 	}
-	@Bean
-	Queue queue() {
-		return new Queue("SearchQ", false);
-	}
-	@Bean
-	Queue queue1() {
-		return new Queue("CheckINQ", false);
-	}
-	
-	
-	public void send(Object message){
-		template.convertAndSend("SearchQ", message);
+
+	// Sends booking event to search service so it can update its flight inventory cache.
+	// Payload is a Map<String,Object> — converted to JMS MapMessage by Spring's SimpleMessageConverter.
+	public void send(Object message) {
+		jmsTemplate.convertAndSend("SearchQ", message);
 	}
 }
