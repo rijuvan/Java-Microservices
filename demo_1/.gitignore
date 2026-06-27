@@ -1,6 +1,17 @@
 target/
 !.mvn/wrapper/maven-wrapper.jar
 
+# Package files
+*.jar
+*.war
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# Compiled class files
+*.class
+
 ### STS ###
 .apt_generated
 .classpath
@@ -22,3 +33,23 @@ nbbuild/
 dist/
 nbdist/
 .nb-gradle/
+
+# Secrets and credentials
+*.env
+.env
+.env.*
+application-secret*.properties
+application-secret*.yml
+application-prod*.properties
+application-prod*.yml
+*-credentials.json
+credentials.json
+credentials.properties
+secrets.properties
+secrets.yml
+*.pem
+*.key
+*.p12
+*.jks
+*.keystore
+*.truststore

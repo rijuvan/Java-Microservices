@@ -43,3 +43,24 @@ nbdist/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Secrets and credentials
+*.env
+.env
+.env.*
+application-secret*.properties
+application-secret*.yml
+application-prod*.properties
+application-prod*.yml
+*-credentials.json
+*-credentials.yml
+credentials.json
+credentials.properties
+secrets.properties
+secrets.yml
+*.pem
+*.key
+*.p12
+*.jks
+*.keystore
+*.truststore
