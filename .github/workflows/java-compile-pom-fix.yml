@@ -1,0 +1,218 @@
+name: Java Compile & POM Dependency Fix Agent
+
+on:
+  workflow_dispatch:
+    inputs:
+      service:
+        description: 'Target service to fix'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - fares
+          - search
+          - book
+          - checkin
+          - website
+      fix_type:
+        description: 'Type of fix to apply'
+        required: false
+        default: 'both'
+        type: choice
+        options:
+          - both
+          - compile-errors
+          - pom-dependencies
+  push:
+    branches: [master]
+    paths:
+      - '**/pom.xml'
+      - '**/src/main/java/**/*.java'
+  pull_request:
+    paths:
+      - '**/pom.xml'
+      - '**/src/main/java/**/*.java'
+
+jobs:
+  detect-build-errors:
+    name: Detect Java Build Errors
+    runs-on: ubuntu-latest
+    outputs:
+      has_errors: ${{ steps.build-check.outputs.has_errors }}
+      error_summary: ${{ steps.build-check.outputs.error_summary }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Run build check across all services
+        id: build-check
+        run: |
+          SERVICES="fares search book checkin website"
+          HAS_ERRORS=false
+          SUMMARY=""
+
+          for svc in $SERVICES; do
+            if [ -d "$svc" ]; then
+              echo "--- Checking $svc ---"
+              OUTPUT=$(cd "$svc" && mvn clean compile -DskipTests 2>&1 || true)
+              if echo "$OUTPUT" | grep -qE "BUILD FAILURE|ERROR|COMPILATION ERROR"; then
+                HAS_ERRORS=true
+                ERRORS=$(echo "$OUTPUT" | grep -E "ERROR|error:" | head -20)
+                SUMMARY="${SUMMARY}[$svc] BUILD FAILED:\n${ERRORS}\n"
+                echo "BUILD FAILED in $svc"
+              else
+                echo "BUILD OK in $svc"
+              fi
+            fi
+          done
+
+          echo "has_errors=$HAS_ERRORS" >> "$GITHUB_OUTPUT"
+          # Store summary (truncated for env var safety)
+          {
+            echo 'error_summary<<EOF'
+            echo -e "$SUMMARY" | head -100
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Upload full build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: /tmp/build-*.log
+          if-no-files-found: ignore
+
+  fix-compile-and-pom:
+    name: Fix Compile Errors & POM Dependencies
+    needs: detect-build-errors
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+      actions: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Run Java Compile & POM Fix Agent
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            You are a Java build-fix agent for the BrownField Passenger Service System (PSS),
+            a Spring Boot microservices learning project.
+
+            Target service(s): ${{ inputs.service || 'all' }}
+            Fix type: ${{ inputs.fix_type || 'both' }}
+
+            ## Project layout (each is a standalone Maven project — NO parent pom)
+            - fares/    — fare lookup, port 8080
+            - search/   — flight search + JMS listener (SearchQ), port 8090
+            - book/     — booking + JMS sender (SearchQ) + JMS listener (CheckINQ), port 8060
+            - checkin/  — check-in + JMS sender (CheckINQ), port 8070
+            - website/  — Thymeleaf UI (RestTemplate), port 8001
+
+            ## Stack (authoritative — do NOT downgrade)
+            - Java 21
+            - Spring Boot 3.5.15
+            - Spring Data JPA
+            - H2 (in-memory database)
+            - ActiveMQ Classic (JMS)
+            - springdoc-openapi 2.8.15
+            - Thymeleaf
+
+            ## Build-error diagnosis steps (repeat for each target service)
+
+            ### Step 1 — Capture compile output
+            Run inside the service directory:
+            ```
+            mvn clean compile -DskipTests 2>&1
+            ```
+            Save the full output. Note every ERROR line and its file:line reference.
+
+            ### Step 2 — Diagnose POM dependencies
+            Run inside the service directory:
+            ```
+            mvn dependency:tree 2>&1
+            mvn dependency:analyze 2>&1
+            ```
+            Look for:
+            - Missing or unresolvable dependencies (artifact not found)
+            - Version conflicts (convergence errors, `Require upper bound`)
+            - Declared-but-unused or used-but-undeclared dependencies
+            - Deprecated/EOL versions of Spring Boot starters or plugins
+            - Missing `<dependencyManagement>` entries that cause version drift
+
+            ### Step 3 — Fix compile errors (when fix_type is 'both' or 'compile-errors')
+            Read the referenced Java source files. Common causes in Spring Boot 3.x / Java 21:
+            - `javax.*` imports must be `jakarta.*`
+            - `HttpMethod` enum changes (e.g., `HttpMethod.GET.name()` → `HttpMethod.GET`)
+            - Spring Security lambda DSL required (no more method-chaining `.and()`)
+            - `WebSecurityConfigurerAdapter` removed — use `SecurityFilterChain` bean
+            - `@Transactional` must import from `jakarta.transaction` not `javax.transaction`
+            - JPA: `CrudRepository.findById` returns `Optional<>` — handle correctly
+            - Records, sealed classes, text blocks are fine (Java 21 features)
+            Apply minimal targeted edits — do NOT restructure or rename.
+
+            ### Step 4 — Fix POM dependencies (when fix_type is 'both' or 'pom-dependencies')
+            Edit pom.xml files to:
+            - Add missing dependencies that the code actually uses
+            - Remove dependencies listed as used-but-not-declared or declared-but-unused
+            - Resolve version conflicts by adding `<dependencyManagement>` entries or explicit versions
+            - Replace deprecated artifact coordinates (e.g., old `spring-boot-starter-data-jpa` groupId)
+            - Keep ALL versions aligned with Spring Boot 3.5.15 BOM where possible
+            - Do NOT change the Spring Boot parent version
+            - Do NOT add dependencies the code does not use
+
+            ### Step 5 — Verify
+            After every edit, re-run:
+            ```
+            mvn clean compile -DskipTests 2>&1
+            ```
+            Confirm `BUILD SUCCESS`. If it still fails, read the new errors and fix again.
+            Then run:
+            ```
+            mvn test 2>&1
+            ```
+            Fix any test compilation errors. Runtime test failures may be skipped with a note.
+
+            ## Hard constraints — never violate these
+            - Service URLs are intentionally hardcoded (`localhost:808x`) — do NOT introduce service discovery.
+            - H2 in-memory database is intentional — do NOT add an external DB or Flyway/Liquibase.
+            - Do NOT add features, new endpoints, or refactor for hypothetical future use.
+            - Do NOT change the Spring Boot parent `<version>` tag.
+            - Do NOT touch `.github/` files.
+
+            ## Output
+            After all fixes are applied and verified, create a pull request:
+            - Title: `fix(build): resolve Java compile errors and POM dependency issues`
+            - Body must list for each service:
+              1. Errors found (with file:line if available)
+              2. Root cause
+              3. Fix applied
+              4. Verification result (`mvn clean compile` exit code)
+            - If any issue could not be fixed automatically, list it under "Needs manual review"
+          claude_args: >-
+            --allowed-tools Bash(mvn *),Read,Edit,Glob,Grep
