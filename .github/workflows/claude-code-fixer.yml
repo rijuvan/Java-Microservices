@@ -1,0 +1,101 @@
+name: Claude Code Fixer Agent
+
+on:
+  workflow_dispatch:
+    inputs:
+      service:
+        description: 'Target service to fix'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - fares
+          - search
+          - book
+          - checkin
+          - website
+      fix_scope:
+        description: 'Scope of fixes to apply'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - compilation
+          - deprecations
+          - security
+          - quality
+
+jobs:
+  fix-code:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+      actions: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Run Claude Code Fixer
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            You are a Java code fixer agent for the BrownField Passenger Service System (PSS),
+            a Spring Boot microservices learning project.
+
+            Target service(s): ${{ inputs.service || 'all' }}
+            Fix scope: ${{ inputs.fix_scope || 'all' }}
+
+            ## Project layout
+            Each service is a standalone Maven project (no parent pom):
+            - fares/    — fare lookup, port 8080
+            - search/   — flight search + JMS listener (SearchQ), port 8090
+            - book/     — booking + JMS sender (SearchQ) + JMS listener (CheckINQ), port 8060
+            - checkin/  — check-in + JMS sender (CheckINQ), port 8070
+            - website/  — Thymeleaf UI (RestTemplate), port 8001
+
+            Stack: Java 21, Spring Boot 3.5.15, Spring Data JPA, H2 (in-memory), ActiveMQ Classic,
+                   springdoc-openapi 2.8.15, Thymeleaf.
+
+            ## Steps to follow for EACH target service directory
+
+            1. Run `mvn clean verify -DskipTests` inside the service directory and capture output.
+            2. Read all Java source files under src/main/java/ and src/test/java/.
+            3. Identify and fix issues appropriate to the requested scope:
+               - **compilation**: errors, warnings flagged by javac
+               - **deprecations**: replace deprecated Spring Boot / JPA / JMS APIs with current equivalents
+               - **security**: remove hardcoded secrets, fix injection risks, add input validation at
+                               controller boundaries only (not internal service calls)
+               - **quality**: unused imports, raw types, missing @Override, inconsistent error handling,
+                              overly broad catch blocks
+            4. Re-run `mvn clean verify -DskipTests` and confirm it passes.
+            5. If tests exist, run `mvn test` and fix any failures.
+
+            ## Hard constraints — do NOT change these
+            - Service URLs are intentionally hardcoded (localhost:808x) — no service discovery needed.
+            - H2 in-memory database is intentional — do not add an external DB dependency.
+            - Do not add new features, refactor for hypothetical future requirements, or change APIs.
+            - Do not modify pom.xml versions unless a version is the direct cause of a build failure.
+
+            ## Output
+            After fixing all target services, create a pull request that:
+            - Has a concise title like "fix: code fixer agent corrections for <service(s)>"
+            - Lists each service, the issues found, and what was changed in the PR body
+            - Notes any remaining issues that required manual intervention
+          claude_args: >-
+            --allowed-tools Bash(mvn *),Read,Edit,Glob,Grep
